@@ -144,7 +144,7 @@ def generate_and_send_payslip(row, sender_email, sender_password, selected_month
 
 Please find attached your payslip for {selected_month}.
 
-Your payslip is password protected. The password is your PIN (default: 1234 if not set).
+Your payslip is password protected. The password is your ID NUMBER.
 
 If you have any questions about your payslip, please contact HR.
 
