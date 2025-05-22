@@ -1,6 +1,30 @@
 import streamlit as st
 import pandas as pd
 from utils import generate_and_send_payslip
+
+# --- Login Check (Added at the top, preserves your original structure) ---
+def check_login():
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+    
+    if not st.session_state.logged_in:
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            username = st.text_input("Username", key="username")
+        with col2:
+            password = st.text_input("Password", type="password", key="password")
+        
+        if st.button("Login"):
+            if username == "admin" and password == "1234":
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Invalid credentials")
+        st.stop()
+
+check_login()  # Blocks app if not logged in
+
+# --- Your Original App Code (Unchanged Below) ---
 # App configuration
 st.set_page_config(
     page_title="Payslip Generator",
@@ -67,6 +91,11 @@ st.markdown("""
         <p style="color: #7f8c8d; margin: 0.5rem 0 0;">Generate and send professional payslips to your employees</p>
     </div>
 """, unsafe_allow_html=True)
+
+# Add logout button (New addition at the top of your app body)
+if st.sidebar.button("Logout"):
+    st.session_state.logged_in = False
+    st.rerun()
 
 # File upload section
 st.markdown('<div class="file-uploader">', unsafe_allow_html=True)
