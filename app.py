@@ -160,7 +160,7 @@ if uploaded_file:
                     success_count = 0
                     for i, (index, row) in enumerate(filtered_df.iterrows()):
                         try:
-                            progress = int((i + 1) / len(filtered_df) * 100
+                            progress = int((i + 1) / len(filtered_df) * 100)
                             progress_bar.progress(progress)
                             status_text.text(f"Processing {i+1}/{len(filtered_df)}: {row['Name']}")
                             
