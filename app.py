@@ -2,6 +2,39 @@ import streamlit as st
 import pandas as pd
 from utils import generate_and_send_payslip
 
+# --- 1. Set Light Black Background (Add at the very top) ---
+st.markdown("""
+    <style>
+        /* Main background */
+        .stApp {
+            background-color: #f0f2f6;  /* Light black/gray */
+        }
+        
+        /* Content containers */
+        .main .block-container, 
+        .st-emotion-cache-1y4p8pa {
+            background-color: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* Login container */
+        .login-container {
+            background-color: white !important;
+        }
+        
+        /* File uploader */
+        .file-uploader {
+            background-color: white !important;
+        }
+        
+        /* Email section */
+        .email-section {
+            background-color: #f8f9fa !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 # --- Login Check (Added at the top, preserves your original structure) ---
 def check_login():
     if "logged_in" not in st.session_state:
