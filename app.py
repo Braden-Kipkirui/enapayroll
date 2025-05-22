@@ -8,21 +8,64 @@ def check_login():
         st.session_state.logged_in = False
     
     if not st.session_state.logged_in:
+        # Login Page Branding
+        st.markdown("""
+        <style>
+            .login-container {
+                max-width: 500px;
+                margin: 0 auto;
+                padding: 2rem;
+                border-radius: 10px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                background: white;
+            }
+            .login-title {
+                color: #2c3e50;
+                text-align: center;
+                margin-bottom: 1.5rem;
+            }
+            .login-logo {
+                text-align: center;
+                font-size: 2.5rem;
+                margin-bottom: 1rem;
+            }
+            .login-footer {
+                text-align: center;
+                margin-top: 2rem;
+                color: #7f8c8d;
+                font-size: 0.8rem;
+            }
+        </style>
+        
+        <div class="login-container">
+            <div class="login-logo">💼</div>
+            <h2 class="login-title">ENA COACH LTD</h2>
+            <h3 style="text-align: center; color: #3498db; margin-bottom: 2rem;">Payslip Generator Portal</h3>
+        """, unsafe_allow_html=True)
+
         col1, col2 = st.columns([1, 2])
         with col1:
             username = st.text_input("Username", key="username")
         with col2:
             password = st.text_input("Password", type="password", key="password")
         
-        if st.button("Login"):
+        if st.button("Login", key="login-btn"):
             if username == "admin" and password == "1234":
                 st.session_state.logged_in = True
                 st.rerun()
             else:
-                st.error("Invalid credentials")
+                st.error("Invalid credentials. Please try again.")
+        
+        st.markdown("""
+            <div class="login-footer">
+                <p>Restricted access for authorized personnel only</p>
+                <p>© 2023 ENA COACH LTD. All rights reserved</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         st.stop()
 
-check_login()  # Blocks app if not logged in
+check_login()  # Blocks app if not logged in  # Blocks app if not logged in
 
 # --- Your Original App Code (Unchanged Below) ---
 # App configuration
