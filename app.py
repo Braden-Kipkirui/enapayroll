@@ -1,6 +1,12 @@
 import streamlit as st
 import pandas as pd
 from utils import generate_and_send_payslip
+# App configuration
+st.set_page_config(
+    page_title="Payslip Generator",
+    layout="centered",
+    page_icon="💼"
+)
 
 # Custom CSS for professional styling
 st.markdown("""
@@ -51,13 +57,6 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-
-# App configuration
-st.set_page_config(
-    page_title="Payslip Generator",
-    layout="centered",
-    page_icon="💼"
-)
 
 # Header with logo (you can replace with your actual logo)
 st.markdown("""
