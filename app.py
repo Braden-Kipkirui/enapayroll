@@ -7,7 +7,7 @@ st.markdown("""
     <style>
         /* Main background */
         .stApp {
-            background-color: #f0f2f6;  /* Light black/gray */
+            background-color: #121212;  /* Light black/gray */
         }
         
         /* Content containers */
