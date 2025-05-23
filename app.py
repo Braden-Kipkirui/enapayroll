@@ -2,6 +2,12 @@ import streamlit as st
 import pandas as pd
 from utils import generate_and_send_payslip
 
+# App configuration
+st.set_page_config(
+    page_title="Payslip Generator",
+    layout="centered",
+    page_icon="💼"
+)
 # --- 1. Set Light Black Background (Add at the very top) ---
 st.markdown("""
     <style>
@@ -101,12 +107,6 @@ def check_login():
 check_login()  # Blocks app if not logged in  # Blocks app if not logged in
 
 # --- Your Original App Code (Unchanged Below) ---
-# App configuration
-st.set_page_config(
-    page_title="Payslip Generator",
-    layout="centered",
-    page_icon="💼"
-)
 
 # Custom CSS for professional styling
 st.markdown("""
