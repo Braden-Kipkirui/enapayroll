@@ -1,191 +1,160 @@
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.platypus import Table, TableStyle, Paragraph
-from reportlab.lib import colors
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import mm
-from io import BytesIO
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.application import MIMEApplication
-from email.mime.text import MIMEText
-from PyPDF2 import PdfReader, PdfWriter
+import streamlit as st
 import pandas as pd
+from utils import generate_and_send_payslip
+import time
 from datetime import datetime
 
-def format_currency(amount):
-    """Format amount as currency with thousands separator"""
-    try:
-        return f"{float(amount):,.2f}"
-    except (ValueError, TypeError):
-        return "0.00"
+# Page configuration
+st.set_page_config(
+    page_title="ENA Coach Payslip Generator",
+    page_icon="📩",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-def generate_and_send_payslip(row, sender_email, sender_password, selected_month):
-    # Create PDF buffer
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-    
-    # Define colors
-    header_color = colors.Color(0.2, 0.3, 0.7)  # Professional blue
-    text_color = colors.Color(0.2, 0.2, 0.2)    # Dark gray
-    
-    # Header section
-    c.setFillColor(header_color)
-    c.rect(0, height - 120, width, 120, fill=1)
-    c.setFillColor(colors.white)
-    
-    # Company logo placeholder (you can add actual logo later)
-    c.rect(30, height - 90, 60, 60, fill=0)
-    
-    # Company details
-    c.setFont("Helvetica-Bold", 20)
-    c.drawString(100, height - 45, "ENA COACH LTD")
-    c.setFont("Helvetica", 10)
-    c.drawString(100, height - 60, "KPCU, Nairobi Kenya")
-    c.drawString(100, height - 75, "Phone: +254 709 832 000")
-    c.drawString(100, height - 90, "Email: info@enacoach.co.ke")
-    
-    # Payslip details on right
-    c.setFont("Helvetica-Bold", 12)
-    c.drawRightString(width - 30, height - 45, f"PAY DATE: 20 {selected_month}")
-    c.drawRightString(width - 30, height - 60, "PAY TYPE: Bank Transfer")
-    c.drawRightString(width - 30, height - 75, f"PERIOD: {selected_month}")
-    
-    # Reset color for main content
-    c.setFillColor(text_color)
-    
-    # Employee details section
-    c.roundRect(30, height - 200, width - 60, 60, 5, stroke=1, fill=0)
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(40, height - 170, "EMPLOYEE DETAILS")
-    c.setFont("Helvetica", 10)
-    c.drawString(40, height - 185, f"Name: {row['Name']}")
-    c.drawString(40, height - 200, f"Email: {row['Email']}")
-    
-    if 'Employee ID' in row:
-        c.drawString(width/2, height - 185, f"Employee ID: {row['Employee ID']}")
-    if 'Department' in row:
-        c.drawString(width/2, height - 200, f"Department: {row['Department']}")
-    
-    # Salary breakdown table
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(30, height - 240, "SALARY BREAKDOWN")
-    
-    # Create two columns for earnings and deductions
-    earnings_data = [
-        ['EARNINGS', 'AMOUNT (KES)'],
-        ['Basic Salary', format_currency(row['Basic Salary'])],
-        ['Overtime Pay', format_currency(row['Overtime'])],
-        ['Allowance', format_currency(row['Allowance'])],
-    ]
-    
-    deductions_data = [
-        ['DEDUCTIONS', 'AMOUNT (KES)'],
-        ['PAYE Tax', format_currency(row['PAYE Tax'])],
-        ['SHA', format_currency(row['SHA'])],
-        ['NSSF', format_currency(row['NSSF'])],
-        ['Penalties', format_currency(row['Penalties'])],
-        ['Other Deductions', format_currency(row['Deductions'])],
-    ]
-    
-    # Style for tables
-    table_style = TableStyle([
-        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
-        ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONT', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.9, 0.9, 0.9)),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-        ('TOPPADDING', (0, 0), (-1, 0), 6),
-    ])
-    
-    # Draw earnings table
-    earnings = Table(earnings_data, colWidths=[140, 100])
-    earnings.setStyle(table_style)
-    earnings.wrapOn(c, width, height)
-    earnings.drawOn(c, 30, height - 380)
-    
-    # Draw deductions table
-    deductions = Table(deductions_data, colWidths=[140, 100])
-    deductions.setStyle(table_style)
-    deductions.wrapOn(c, width, height)
-    deductions.drawOn(c, width/2 + 30, height - 380)
-    
-    # Net pay section with highlight
-    net_pay = float(row['Net Salary'])
-    c.setFillColor(colors.Color(0.95, 0.95, 1.0))  # Light blue background
-    c.roundRect(30, height - 440, width - 60, 40, 5, stroke=1, fill=1)
-    c.setFillColor(header_color)
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(40, height - 420, "NET PAY:")
-    c.setFont("Helvetica-Bold", 14)
-    c.drawRightString(width - 40, height - 420, f"KES {format_currency(net_pay)}")
-    
-    # Footer
-    c.setFillColor(text_color)
-    c.setFont("Helvetica", 8)
-    footer_text = [
-        "This is a computer generated payslip and does not require signature.",
-        f"Generated on: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}",
-        "For any queries, please contact HR department at hr@enacoach.co.ke"
-    ]
-    
-    y_position = 50
-    for text in footer_text:
-        c.drawCentredString(width/2, y_position, text)
-        y_position -= 15
-    
-    # Save PDF
-    c.showPage()
-    c.save()
-    buffer.seek(0)
-    
-    # Encrypt PDF
-    reader = PdfReader(buffer)
-    writer = PdfWriter()
-    for page in reader.pages:
-        writer.add_page(page)
-    
-    # Use last 4 digits of employee ID or default PIN
-    pin = str(row['pin']) if 'pin' in row and pd.notna(row['pin']) else "1234"
-    writer.encrypt(user_password=pin, owner_password=pin)
-    
-    encrypted_pdf = BytesIO()
-    writer.write(encrypted_pdf)
-    encrypted_pdf.seek(0)
-    
-    # Prepare email
-    msg = MIMEMultipart()
-    msg['From'] = sender_email
-    msg['To'] = row['Email']
-    msg['Subject'] = f"Payslip for {selected_month} - ENA COACH LTD"
-    
-    # Email body
-    email_body = f"""Dear {row['Name']},
+# Custom CSS
+st.markdown("""
+    <style>
+    .main {
+        padding: 2rem;
+    }
+    .stButton>button {
+        width: 100%;
+        margin-top: 1rem;
+    }
+    .upload-section {
+        border: 2px dashed #cccccc;
+        border-radius: 5px;
+        padding: 2rem;
+        text-align: center;
+        margin: 2rem 0;
+    }
+    .success-message {
+        padding: 1rem;
+        background-color: #d4edda;
+        border-radius: 5px;
+        margin: 1rem 0;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-Please find attached your payslip for {selected_month}.
-
-To open the PDF, use your PIN: {pin}
-
-Note: This is an automated email. Please do not reply to this email address.
-For any queries regarding your payslip, please contact the HR department.
-
-Best regards,
-HR Department
-ENA COACH LTD
-"""
+# Sidebar for company info and instructions
+with st.sidebar:
+    st.title("ℹ️ Information")
+    st.image("https://placeholder.com/150x150", caption="Upload company logo")
     
-    msg.attach(MIMEText(email_body, 'plain'))
+    st.markdown("""
+    ### Instructions
+    1. Upload your Excel file containing employee data
+    2. Select the month for payslip generation
+    3. Enter your email credentials
+    4. Review the data and send payslips
     
-    # Attach PDF
-    attachment = MIMEApplication(encrypted_pdf.read(), _subtype="pdf")
-    filename = f"Payslip_{row['Name'].replace(' ', '_')}_{selected_month}.pdf"
-    attachment.add_header('Content-Disposition', 'attachment', filename=filename)
-    msg.attach(attachment)
+    ### Required Excel Columns
+    - Name
+    - Email
+    - Month
+    - Basic Salary
+    - Overtime
+    - Allowance
+    - PAYE Tax
+    - SHA
+    - NSSF
+    - Penalties
+    - Deductions
+    - Net Salary
     
-    # Send email
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-        server.login(sender_email, sender_password)
-        server.send_message(msg)
+    ### Need Help?
+    Contact support at support@enacoach.co.ke
+    """)
+
+# Main content
+st.title("📩 ENA Coach Payslip Generator & Email Sender")
+st.markdown("Generate and send professional payslips to your employees securely.")
+
+# File upload section with drag and drop
+st.markdown('<div class="upload-section">', unsafe_allow_html=True)
+uploaded_file = st.file_uploader(
+    "Drag and drop your payroll Excel file here",
+    type=["xlsx"],
+    help="Upload an Excel file containing employee payroll data"
+)
+st.markdown('</div>', unsafe_allow_html=True)
+
+if uploaded_file:
+    with st.spinner('Processing file...'):
+        try:
+            df = pd.read_excel(uploaded_file)
+            required_columns = ['Month', 'Email', 'Name', 'Basic Salary', 'Net Salary']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            
+            if missing_columns:
+                st.error(f"Missing required columns: {', '.join(missing_columns)}")
+            else:
+                # Create two columns for the layout
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    st.success("✅ File uploaded successfully!")
+                    months = sorted(df['Month'].dropna().unique())
+                    current_month = datetime.now().strftime("%B %Y")
+                    default_month_index = months.index(current_month) if current_month in months else 0
+                    selected_month = st.selectbox(
+                        "Select Month to Send Payslips",
+                        months,
+                        index=default_month_index,
+                        help="Choose the month for which you want to generate payslips"
+                    )
+                    
+                    filtered_df = df[df['Month'] == selected_month]
+                    st.metric("Number of Employees", len(filtered_df))
+                    
+                    # Display preview with pagination
+                    st.subheader("📋 Data Preview")
+                    page_size = 5
+                    page_number = st.number_input("Page", min_value=1, max_value=(len(filtered_df) // page_size) + 1, value=1)
+                    start_idx = (page_number - 1) * page_size
+                    end_idx = start_idx + page_size
+                    st.dataframe(filtered_df.iloc[start_idx:end_idx], use_container_width=True)
+                
+                with col2:
+                    st.subheader("📧 Email Settings")
+                    with st.form("email_settings"):
+                        sender_email = st.text_input(
+                            "Sender Email",
+                            help="Enter your Gmail address"
+                        )
+                        sender_password = st.text_input(
+                            "App Password",
+                            type="password",
+                            help="Enter your Gmail App Password (not your regular password)"
+                        )
+                        
+                        submit_button = st.form_submit_button("📨 Send Payslips")
+                        
+                        if submit_button:
+                            if not sender_email or not sender_password:
+                                st.error("Email and password are required.")
+                            else:
+                                progress_bar = st.progress(0)
+                                status_text = st.empty()
+                                
+                                for index, row in filtered_df.iterrows():
+                                    try:
+                                        progress = (index + 1) / len(filtered_df)
+                                        status_text.text(f"Processing: {row['Name']}")
+                                        
+                                        generate_and_send_payslip(row, sender_email, sender_password, selected_month)
+                                        progress_bar.progress(progress)
+                                        
+                                        st.success(f"✅ Sent to {row['Email']}")
+                                        time.sleep(0.5)  # Small delay for better UX
+                                        
+                                    except Exception as e:
+                                        st.error(f"❌ Error sending to {row['Email']}: {str(e)}")
+                                
+                                status_text.text("✨ All payslips processed!")
+
+        except Exception as e:
+            st.error(f"Failed to process file: {str(e)}")
+            st.info("Please make sure your Excel file is properly formatted and contains all required columns.")
