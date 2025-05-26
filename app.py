@@ -1,289 +1,191 @@
-import streamlit as st
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.platypus import Table, TableStyle, Paragraph
+from reportlab.lib import colors
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from io import BytesIO
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+from email.mime.text import MIMEText
+from PyPDF2 import PdfReader, PdfWriter
 import pandas as pd
-from utils import generate_and_send_payslip
+from datetime import datetime
 
-# App configuration
-st.set_page_config(
-    page_title="Payslip Generator",
-    layout="centered",
-    page_icon="💼"
-)
-# --- 1. Set Light Black Background (Add at the very top) ---
-st.markdown("""
-    <style>
-        /* Main background */
-        .stApp {
-            background-color: #121212;  /* Light black/gray */
-        }
-        
-        /* Content containers */
-        .main .block-container, 
-        .st-emotion-cache-1y4p8pa {
-            background-color: white;
-            border-radius: 10px;
-            padding: 2rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        
-        /* Login container */
-        .login-container {
-            background-color: white !important;
-        }
-        
-        /* File uploader */
-        .file-uploader {
-            background-color: white !important;
-        }
-        
-        /* Email section */
-        .email-section {
-            background-color: #f8f9fa !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
-# --- Login Check (Added at the top, preserves your original structure) ---
-def check_login():
-    if "logged_in" not in st.session_state:
-        st.session_state.logged_in = False
-    
-    if not st.session_state.logged_in:
-        # Login Page Branding
-        st.markdown("""
-        <style>
-            .login-container {
-                max-width: 500px;
-                margin: 0 auto;
-                padding: 2rem;
-                border-radius: 10px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                background: white;
-            }
-            .login-title {
-                color: #2c3e50;
-                text-align: center;
-                margin-bottom: 1.5rem;
-            }
-            .login-logo {
-                text-align: center;
-                font-size: 2.5rem;
-                margin-bottom: 1rem;
-            }
-            .login-footer {
-                text-align: center;
-                margin-top: 2rem;
-                color: #7f8c8d;
-                font-size: 0.8rem;
-            }
-        </style>
-        
-        <div class="login-container">
-            <div class="login-logo">💼</div>
-            <h2 class="login-title">ENA COACH LTD</h2>
-            <h3 style="text-align: center; color: #3498db; margin-bottom: 2rem;">Payslip Generator Portal</h3>
-        """, unsafe_allow_html=True)
-
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            username = st.text_input("Username", key="username")
-        with col2:
-            password = st.text_input("Password", type="password", key="password")
-        
-        if st.button("Login", key="login-btn"):
-            if username == "admin" and password == "1234":
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Invalid credentials. Please try again.")
-        
-        st.markdown("""
-            <div class="login-footer">
-                <p>Restricted access for authorized personnel only</p>
-                <p>© 2023 ENA COACH LTD. All rights reserved</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.stop()
-
-check_login()  # Blocks app if not logged in  # Blocks app if not logged in
-
-# --- Your Original App Code (Unchanged Below) ---
-
-# Custom CSS for professional styling
-st.markdown("""
-    <style>
-        .main {
-            max-width: 900px;
-            padding: 2rem;
-        }
-        .header {
-            color: #2c3e50;
-            border-bottom: 1px solid #e0e0e0;
-            padding-bottom: 1rem;
-            margin-bottom: 2rem;
-        }
-        .stButton>button {
-            background-color: #3498db;
-            color: white;
-            border-radius: 5px;
-            padding: 0.5rem 1rem;
-            border: none;
-            font-weight: 500;
-            transition: all 0.3s;
-        }
-        .stButton>button:hover {
-            background-color: #2980b9;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        .stAlert {
-            border-radius: 5px;
-        }
-        .stDataFrame {
-            border-radius: 5px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .file-uploader {
-            border: 2px dashed #3498db;
-            border-radius: 5px;
-            padding: 2rem;
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        .email-section {
-            background-color: #f8f9fa;
-            padding: 1.5rem;
-            border-radius: 5px;
-            margin: 1rem 0;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# Header with logo (you can replace with your actual logo)
-st.markdown("""
-    <div class="header">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-            <h1 style="margin: 0;">ENA Coach Payslip Generator</h1>
-        </div>
-        <p style="color: #7f8c8d; margin: 0.5rem 0 0;">Generate and send professional payslips to your employees</p>
-    </div>
-""", unsafe_allow_html=True)
-
-# Add logout button (New addition at the top of your app body)
-if st.sidebar.button("Logout"):
-    st.session_state.logged_in = False
-    st.rerun()
-
-# File upload section
-st.markdown('<div class="file-uploader">', unsafe_allow_html=True)
-uploaded_file = st.file_uploader(
-    "Upload Payroll Excel File", 
-    type=["xlsx"],
-    help="Please upload an Excel file with columns: Month, Email, Name, Basic Salary, etc."
-)
-st.markdown('</div>', unsafe_allow_html=True)
-
-if uploaded_file:
+def format_currency(amount):
+    """Format amount as currency with thousands separator"""
     try:
-        df = pd.read_excel(uploaded_file)
+        return f"{float(amount):,.2f}"
+    except (ValueError, TypeError):
+        return "0.00"
 
-        if 'Month' not in df.columns or 'Email' not in df.columns:
-            st.error("❌ Missing required columns: 'Month' or 'Email' must be present in the file.")
-        else:
-            # Data processing
-            months = sorted(df['Month'].dropna().unique())
-            selected_month = st.selectbox(
-                "Select Month to Send Payslips", 
-                months,
-                help="Select the month for which you want to generate payslips"
-            )
-            filtered_df = df[df['Month'] == selected_month]
+def generate_and_send_payslip(row, sender_email, sender_password, selected_month):
+    # Create PDF buffer
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    
+    # Define colors
+    header_color = colors.Color(0.2, 0.3, 0.7)  # Professional blue
+    text_color = colors.Color(0.2, 0.2, 0.2)    # Dark gray
+    
+    # Header section
+    c.setFillColor(header_color)
+    c.rect(0, height - 120, width, 120, fill=1)
+    c.setFillColor(colors.white)
+    
+    # Company logo placeholder (you can add actual logo later)
+    c.rect(30, height - 90, 60, 60, fill=0)
+    
+    # Company details
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(100, height - 45, "ENA COACH LTD")
+    c.setFont("Helvetica", 10)
+    c.drawString(100, height - 60, "KPCU, Nairobi Kenya")
+    c.drawString(100, height - 75, "Phone: +254 709 832 000")
+    c.drawString(100, height - 90, "Email: info@enacoach.co.ke")
+    
+    # Payslip details on right
+    c.setFont("Helvetica-Bold", 12)
+    c.drawRightString(width - 30, height - 45, f"PAY DATE: 20 {selected_month}")
+    c.drawRightString(width - 30, height - 60, "PAY TYPE: Bank Transfer")
+    c.drawRightString(width - 30, height - 75, f"PERIOD: {selected_month}")
+    
+    # Reset color for main content
+    c.setFillColor(text_color)
+    
+    # Employee details section
+    c.roundRect(30, height - 200, width - 60, 60, 5, stroke=1, fill=0)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(40, height - 170, "EMPLOYEE DETAILS")
+    c.setFont("Helvetica", 10)
+    c.drawString(40, height - 185, f"Name: {row['Name']}")
+    c.drawString(40, height - 200, f"Email: {row['Email']}")
+    
+    if 'Employee ID' in row:
+        c.drawString(width/2, height - 185, f"Employee ID: {row['Employee ID']}")
+    if 'Department' in row:
+        c.drawString(width/2, height - 200, f"Department: {row['Department']}")
+    
+    # Salary breakdown table
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(30, height - 240, "SALARY BREAKDOWN")
+    
+    # Create two columns for earnings and deductions
+    earnings_data = [
+        ['EARNINGS', 'AMOUNT (KES)'],
+        ['Basic Salary', format_currency(row['Basic Salary'])],
+        ['Overtime Pay', format_currency(row['Overtime'])],
+        ['Allowance', format_currency(row['Allowance'])],
+    ]
+    
+    deductions_data = [
+        ['DEDUCTIONS', 'AMOUNT (KES)'],
+        ['PAYE Tax', format_currency(row['PAYE Tax'])],
+        ['SHA', format_currency(row['SHA'])],
+        ['NSSF', format_currency(row['NSSF'])],
+        ['Penalties', format_currency(row['Penalties'])],
+        ['Other Deductions', format_currency(row['Deductions'])],
+    ]
+    
+    # Style for tables
+    table_style = TableStyle([
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONT', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.9, 0.9, 0.9)),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        ('TOPPADDING', (0, 0), (-1, 0), 6),
+    ])
+    
+    # Draw earnings table
+    earnings = Table(earnings_data, colWidths=[140, 100])
+    earnings.setStyle(table_style)
+    earnings.wrapOn(c, width, height)
+    earnings.drawOn(c, 30, height - 380)
+    
+    # Draw deductions table
+    deductions = Table(deductions_data, colWidths=[140, 100])
+    deductions.setStyle(table_style)
+    deductions.wrapOn(c, width, height)
+    deductions.drawOn(c, width/2 + 30, height - 380)
+    
+    # Net pay section with highlight
+    net_pay = float(row['Net Salary'])
+    c.setFillColor(colors.Color(0.95, 0.95, 1.0))  # Light blue background
+    c.roundRect(30, height - 440, width - 60, 40, 5, stroke=1, fill=1)
+    c.setFillColor(header_color)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(40, height - 420, "NET PAY:")
+    c.setFont("Helvetica-Bold", 14)
+    c.drawRightString(width - 40, height - 420, f"KES {format_currency(net_pay)}")
+    
+    # Footer
+    c.setFillColor(text_color)
+    c.setFont("Helvetica", 8)
+    footer_text = [
+        "This is a computer generated payslip and does not require signature.",
+        f"Generated on: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}",
+        "For any queries, please contact HR department at hr@enacoach.co.ke"
+    ]
+    
+    y_position = 50
+    for text in footer_text:
+        c.drawCentredString(width/2, y_position, text)
+        y_position -= 15
+    
+    # Save PDF
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    
+    # Encrypt PDF
+    reader = PdfReader(buffer)
+    writer = PdfWriter()
+    for page in reader.pages:
+        writer.add_page(page)
+    
+    # Use last 4 digits of employee ID or default PIN
+    pin = str(row['pin']) if 'pin' in row and pd.notna(row['pin']) else "1234"
+    writer.encrypt(user_password=pin, owner_password=pin)
+    
+    encrypted_pdf = BytesIO()
+    writer.write(encrypted_pdf)
+    encrypted_pdf.seek(0)
+    
+    # Prepare email
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = row['Email']
+    msg['Subject'] = f"Payslip for {selected_month} - ENA COACH LTD"
+    
+    # Email body
+    email_body = f"""Dear {row['Name']},
 
-            # Display summary
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Employees Found", len(filtered_df))
-            with col2:
-                st.metric("Selected Month", selected_month)
+Please find attached your payslip for {selected_month}.
 
-            # Data preview with expander
-            with st.expander("View Employee Data", expanded=False):
-                st.dataframe(filtered_df.style.format({
-                    'Basic Salary': '{:,.2f}',
-                    'Net Salary': '{:,.2f}',
-                    'Overtime': '{:,.2f}'
-                }))
+To open the PDF, use your PIN: {pin}
 
-            # Email settings section
-            st.markdown('<div class="email-section">', unsafe_allow_html=True)
-            st.subheader("📧 Email Settings")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                sender_email = st.text_input(
-                    "Sender Email",
-                    placeholder="your.email@company.com",
-                    help="The email address that will send the payslips"
-                )
-            with col2:
-                sender_password = st.text_input(
-                    "App Password",
-                    type="password",
-                    placeholder="Your email app password",
-                    help="For Gmail, this is an app-specific password"
-                )
-            
-            # Test email option
-            test_email = st.checkbox(
-                "Send test email to myself first",
-                help="Send a sample payslip to your email before sending to all employees"
-            )
-            st.markdown('</div>', unsafe_allow_html=True)
+Note: This is an automated email. Please do not reply to this email address.
+For any queries regarding your payslip, please contact the HR department.
 
-            # Action button
-            if st.button("📨 Send Payslips", key="send_button"):
-                if not sender_email or not sender_password:
-                    st.error("❌ Email and password are required to send payslips.")
-                else:
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-                    
-                    if test_email:
-                        # Send test email
-                        test_row = filtered_df.iloc[0].copy()
-                        test_row['Email'] = sender_email
-                        try:
-                            generate_and_send_payslip(test_row, sender_email, sender_password, selected_month)
-                            st.success(f"✅ Test payslip sent to {sender_email}. Please verify before sending to all employees.")
-                            if not st.checkbox("I've verified the test email and want to proceed"):
-                                st.stop()
-                        except Exception as e:
-                            st.error(f"❌ Error sending test email: {e}")
-                            st.stop()
-                    
-                    # Process all employees
-                    success_count = 0
-                    for i, (index, row) in enumerate(filtered_df.iterrows()):
-                        try:
-                            progress = int((i + 1) / len(filtered_df) * 100)
-                            progress_bar.progress(progress)
-                            status_text.text(f"Processing {i+1}/{len(filtered_df)}: {row['Name']}")
-                            
-                            generate_and_send_payslip(row, sender_email, sender_password, selected_month)
-                            success_count += 1
-                        except Exception as e:
-                            st.error(f"❌ Error sending to {row['Email']}: {str(e)}")
-                    
-                    progress_bar.empty()
-                    status_text.empty()
-                    st.success(f"✅ Successfully sent {success_count} out of {len(filtered_df)} payslips!")
-
-    except Exception as e:
-        st.error(f"❌ Failed to process file: {str(e)}")
-
-# Footer
-st.markdown("---")
-st.markdown("""
-    <div style="text-align: center; color: #7f8c8d; font-size: 0.9rem;">
-        <p>ENA COACH LTD • Payslip Generator v1.0</p>
-    </div>
-""", unsafe_allow_html=True)
+Best regards,
+HR Department
+ENA COACH LTD
+"""
+    
+    msg.attach(MIMEText(email_body, 'plain'))
+    
+    # Attach PDF
+    attachment = MIMEApplication(encrypted_pdf.read(), _subtype="pdf")
+    filename = f"Payslip_{row['Name'].replace(' ', '_')}_{selected_month}.pdf"
+    attachment.add_header('Content-Disposition', 'attachment', filename=filename)
+    msg.attach(attachment)
+    
+    # Send email
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
